@@ -30,12 +30,6 @@ l1LossWeight = 1
 diceLossWeight = 0.5
 
 
-bestDice = -1
-bestDiceEpoch = -1
-
-
-
-
 datasetPngSizeDim = (560, 560)
 trainCropSize = (384, 384)
 valCropSize = (544, 544)
@@ -152,6 +146,9 @@ def getAlphaWeight(unet2out):
 
 
 def main():
+    bestDice = -1
+    bestDiceEpoch = -1
+
     # train loop, for every epoch
     for epoch in range( args.epochs):
         log.info("exp_name={} Epoch: {}, bestDice(epoch) ={:.4f}\t{}".format(exp_name, epoch, bestDice, bestDiceEpoch ))
