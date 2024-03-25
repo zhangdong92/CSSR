@@ -9,10 +9,10 @@ from PIL import Image
 import dcmOperate
 import deformationFieldOperate
 import dice_loss_tool
-import model2 as model
+import model
 import numpy as np
 
-import train
+import srWeights
 from logger import log
 import mask_pic_color_replace
 import cv2
@@ -20,6 +20,7 @@ import os
 
 
 import generateMesh
+import torch.nn.functional as F
 
 predImgSize=(544,544) 
 
@@ -46,9 +47,8 @@ else:
 
 
 unet1 = model.UNet1(6, 4)
+unet2 = model.UNet2(20, 5)
 unet1.to(device)
-
-unet2 = model.UNet(20, 5)
 unet2.to(device)
 
 
@@ -82,6 +82,11 @@ def readImage2Tensor(path):
     return imageTensor
 
 
+def getAlphaWeight(unet2out):
+    alpha0 = F.sigmoid(unet2out[:, 4:5, :, :])
+    alpha1 = 1 - alpha0
+    return alpha0,alpha1
+
 def modelPredOnce(slice0, slice1, insertSliceIndex, saveFilePath):
     slice0=slice0.unsqueeze(0)
     slice1=slice1.unsqueeze(0)
@@ -93,7 +98,8 @@ def modelPredOnce(slice0, slice1, insertSliceIndex, saveFilePath):
     DF_10 = unet1Out[:, :2, :, :]
     DF_01 = unet1Out[:, 2:, :, :]
 
-    dfWeight = model.calcDfWeight(insertSliceIndex, device)
+    insertSliceIndex=torch.tensor([insertSliceIndex])
+    dfWeight = srWeights.calcDfWeight(insertSliceIndex, device)
 
     DF_0i_hat = dfWeight[0] * DF_10 + dfWeight[1] * DF_01
     DF_1i_hat = dfWeight[2] * DF_10 + dfWeight[3] * DF_01
@@ -106,12 +112,12 @@ def modelPredOnce(slice0, slice1, insertSliceIndex, saveFilePath):
 
     DF_0i = unet2out[:, :2, :, :] + DF_0i_hat
     DF_1i = unet2out[:, 2:4, :, :] + DF_1i_hat
-    alpha0, alpha1 = train.getAlphaWeight(unet2out)
+    alpha0, alpha1 = getAlphaWeight(unet2out)
 
     slice_i_0 = valDfModule(slice0, DF_0i)
     slice_i_1 = valDfModule(slice1, DF_1i)
 
-    fusionWeight = model.calcFusionWeight(insertSliceIndex, device)
+    fusionWeight = srWeights.calcFusionWeight(insertSliceIndex, device)
 
     slice_i_pred = (fusionWeight[0] * alpha0 * slice_i_0 + fusionWeight[1] * alpha1 * slice_i_1) / (
                 fusionWeight[0] * alpha0 + fusionWeight[1] * alpha1)
@@ -227,13 +233,13 @@ def createMesh( label8xDirPath, pcDirPath, zMulti, meshDirPath):
 
     
     layerInfoList=[]
-    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"1wall.txt"),os.path.join(meshDirPath,"8.ply"),[1,0,0],False)
+    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"1wall.txt"),os.path.join(meshDirPath,"1wall.ply"),[1,0,0],False)
     layerInfoList.append([isEmpty, "wall","1wall.ply"])
-    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"2cavity.txt"),os.path.join(meshDirPath,"9.ply"),[0,1,0],False)
+    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"2cavity.txt"),os.path.join(meshDirPath,"2cavity.ply"),[0,1,0],False)
     layerInfoList.append([isEmpty, "cavity","2cavity.ply"])
-    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"3leiomyosarcoma.txt"),os.path.join(meshDirPath,"10.ply"),[0,0,1],False) 
+    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"3leiomyosarcoma.txt"),os.path.join(meshDirPath,"3leiomyosarcoma.ply"),[0,0,1],False)
     layerInfoList.append([isEmpty, "leiomyosarcoma","3leiomyosarcoma.ply"])
-    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"4naevus.txt"),os.path.join(meshDirPath,"11.ply"),[1,1,0],False)
+    isEmpty=generateMesh.mesh_rebuild(os.path.join(pcDirPath,"4naevus.txt"),os.path.join(meshDirPath,"4naevus.ply"),[1,1,0],False)
     layerInfoList.append([isEmpty, "naevus","4naevus.ply"])
 
     log.info("generate ply file finish finish, path={}".format(meshDirPath))
