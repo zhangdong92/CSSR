@@ -13,6 +13,8 @@ import dataloader
 import datetime
 from tensorboardX import SummaryWriter
 import numpy as np
+
+import srWeights
 from logger import log
 import mask_pic_color_replace
 import cv2
@@ -177,7 +179,7 @@ def main():
             DF_10 = unet1Out[:, :2, :, :]
             DF_01 = unet1Out[:, 2:, :, :]
 
-            dfWeight = model.calcDfWeight(trainSliceIndex, device)
+            dfWeight = srWeights.calcDfWeight(trainSliceIndex, device)
 
             DF_0i_hat = dfWeight[0] * DF_10 + dfWeight[1] * DF_01
             DF_1i_hat = dfWeight[2] * DF_10 + dfWeight[3] * DF_01
@@ -194,7 +196,7 @@ def main():
             slice_i_0 = trainDfModule(slice0, DF_0i)
             slice_i_1 = trainDfModule(slice1, DF_1i)
 
-            fusionWeight = model.calcFusionWeight(trainSliceIndex, device)
+            fusionWeight = srWeights.calcFusionWeight(trainSliceIndex, device)
 
             slice_i_pred = (fusionWeight[0] * alpha0 * slice_i_0 + fusionWeight[1] * alpha1 * slice_i_1) / ( fusionWeight[0] * alpha0 + fusionWeight[1] * alpha1)
 
@@ -276,7 +278,7 @@ def validate(curEpoch):
             DF_10 = unet1Out[:, :2, :, :]
             DF_01 = unet1Out[:, 2:, :, :]
 
-            dfWeight = model.calcDfWeight(validationSliceIndex, device)
+            dfWeight = srWeights.calcDfWeight(validationSliceIndex, device)
 
             DF_0i_hat = dfWeight[0] * DF_10 + dfWeight[1] * DF_01
             DF_1i_hat = dfWeight[2] * DF_10 + dfWeight[3] * DF_01
@@ -293,7 +295,7 @@ def validate(curEpoch):
             slice_i_0 = valDfModule(slice0, DF_0i)
             slice_i_1 = valDfModule(slice1, DF_1i)
 
-            fusionWeight = model.calcFusionWeight(validationSliceIndex, device)
+            fusionWeight = srWeights.calcFusionWeight(validationSliceIndex, device)
 
             slice_i_pred = (fusionWeight[0] * alpha0 * slice_i_0 + fusionWeight[1] * alpha1 * slice_i_1) / ( fusionWeight[0] * alpha0 + fusionWeight[1] * alpha1)
 
